@@ -80,7 +80,7 @@ uv pip install \
     ninja \
     packaging>=24.2 \
     wheel \
-    setuptools>=77.0.3,<80.0.0
+    "setuptools>=77.0.3,<80.0.0"
 
 echo ""
 echo "=== Cloning and building Triton (main branch) ==="
