@@ -175,7 +175,8 @@ echo "=== Building wheel (this may take a while) ==="
 # vLLM's CMakeLists.txt extracts CUDA archs from CMAKE_CUDA_FLAGS -gencode flags
 # NOT from CMAKE_CUDA_ARCHITECTURES! (see CMakeLists.txt line 148-149)
 # Must add -gencode arch=compute_121a,code=sm_121a to CMAKE_CUDA_FLAGS
-export CMAKE_ARGS="-DCMAKE_CUDA_FLAGS='-allow-unsupported-compiler -gencode arch=compute_121a,code=sm_121a'"
+# Use escaped quotes so the flags are passed as a single value to CMake
+export CMAKE_ARGS="-DCMAKE_CUDA_FLAGS=\"-allow-unsupported-compiler -gencode arch=compute_121a,code=sm_121a\""
 MAX_JOBS=8 python3 -m pip wheel --no-build-isolation --no-deps -w dist .
 
 echo ""
