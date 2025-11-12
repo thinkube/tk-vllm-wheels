@@ -12,7 +12,7 @@ This repository provides vLLM wheels with community patches for DGX Spark GB10 s
 ## Installation
 
 ```bash
-pip install https://github.com/thinkube/tk-vllm-wheels/releases/download/v0.11.1rc5/vllm-0.11.1rc5+cu130-cp312-cp312-linux_aarch64.whl
+pip install https://github.com/thinkube/tk-vllm-wheels/releases/download/v0.11.1rc5/vllm-0.11.1rc6.dev0+g2918c1b49.d20251112.cu130-cp312-cp312-linux_aarch64.whl
 ```
 
 ## Patches Included
