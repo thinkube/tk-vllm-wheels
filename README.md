@@ -1,10 +1,8 @@
-# tk-vllm Wheels
+# tk-vllm-wheels
 
-Pre-built tk-vllm wheels for Thinkube with DGX Spark GB10 patches.
+Pre-built vLLM wheels for DGX Spark GB10 (Blackwell sm_121a).
 
-## What is tk-vllm?
-
-`tk-vllm` is a branded distribution of vLLM with community patches for DGX Spark GB10 (Blackwell architecture).
+This repository provides vLLM wheels with community patches for DGX Spark GB10 support.
 
 ## Current Support
 
@@ -14,14 +12,25 @@ Pre-built tk-vllm wheels for Thinkube with DGX Spark GB10 patches.
 ## Installation
 
 ```bash
-pip install https://github.com/thinkube/tk-vllm-wheels/releases/download/v0.11.1rc5/tk_vllm-0.11.1rc5+thinkube-cp312-cp312-linux_aarch64.whl
+pip install https://github.com/thinkube/tk-vllm-wheels/releases/download/v0.11.1rc5/vllm-0.11.1rc5+cu130-cp312-cp312-linux_aarch64.whl
 ```
 
 ## Patches Included
 
-1. **CMakeLists.txt**: Added sm_121a to MOE kernel support
-2. **pyproject.toml**: Fixed license field for setuptools compatibility
-3. **setup.py**: Changed package name to tk-vllm
+### CMakeLists.txt - Blackwell sm_121a Support
+
+vLLM 0.11.1rc5's CMakeLists.txt has CUDA 13.0-specific architecture lists that only include `12.0f` (SM100) but not `12.1a` (Blackwell GB10). We patch:
+
+- **CUTLASS_MOE_DATA_ARCHS**: Critical for Mixture of Experts models
+- **SCALED_MM_ARCHS**: Scaled matrix multiplication kernels
+- **FP4_ARCHS**: FP4 quantization support
+- **MLA_ARCHS**: Multi-Level Attention kernels
+
+Each is patched to add `12.1a` to the CUDA 13.0 branch.
+
+### pyproject.toml
+
+Fixed license field for setuptools compatibility (`license = {file = "LICENSE"}`).
 
 Based on community solution: [github.com/eelbaz/dgx-spark-vllm-setup](https://github.com/eelbaz/dgx-spark-vllm-setup)
 

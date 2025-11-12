@@ -105,15 +105,30 @@ git checkout ${VLLM_VERSION}
 git submodule update --init --recursive
 
 echo ""
-echo "=== Applying Thinkube patches ==="
+echo "=== Applying Thinkube patches for Blackwell sm_121a support ===\"
 
 # Apply patches from repository
 if [ -f "${SCRIPT_DIR}/patches/cmakelists.patch" ]; then
     echo "Applying CMakeLists.txt patch..."
     patch -p1 < "${SCRIPT_DIR}/patches/cmakelists.patch"
 else
-    echo "Using sed for CMakeLists.txt..."
-    sed -i 's/set(SCALED_MM_ARCHS.*/set(SCALED_MM_ARCHS "8.0;8.6;8.9;9.0;12.0f;12.1a")/' CMakeLists.txt
+    echo "Patching CMakeLists.txt for Blackwell (sm_121a) support..."
+
+    # CUTLASS_MOE_DATA_ARCHS - Add 12.1a to CUDA 13.0 branch (critical for MOE models)
+    sed -i 's/cuda_archs_loose_intersection(CUTLASS_MOE_DATA_ARCHS "9.0a;10.0f;11.0f;12.0f"/cuda_archs_loose_intersection(CUTLASS_MOE_DATA_ARCHS "9.0a;10.0f;11.0f;12.0f;12.1a"/' CMakeLists.txt
+
+    # SCALED_MM_ARCHS - Add 12.1a to CUDA 13.0 branches
+    sed -i 's/cuda_archs_loose_intersection(SCALED_MM_ARCHS "10.0f;11.0f;12.0f"/cuda_archs_loose_intersection(SCALED_MM_ARCHS "10.0f;11.0f;12.0f;12.1a"/' CMakeLists.txt
+    sed -i 's/cuda_archs_loose_intersection(SCALED_MM_ARCHS "12.0f"/cuda_archs_loose_intersection(SCALED_MM_ARCHS "12.0f;12.1a"/' CMakeLists.txt
+
+    # FP4_ARCHS - Add 12.1a to CUDA 13.0 branches
+    sed -i 's/cuda_archs_loose_intersection(FP4_ARCHS "10.0f;11.0f;12.0f"/cuda_archs_loose_intersection(FP4_ARCHS "10.0f;11.0f;12.0f;12.1a"/' CMakeLists.txt
+    sed -i 's/cuda_archs_loose_intersection(FP4_ARCHS "12.0f"/cuda_archs_loose_intersection(FP4_ARCHS "12.0f;12.1a"/' CMakeLists.txt
+
+    # MLA_ARCHS - Add 12.1a to CUDA 13.0 branch
+    sed -i 's/cuda_archs_loose_intersection(MLA_ARCHS "10.0f;11.0f;12.0f"/cuda_archs_loose_intersection(MLA_ARCHS "10.0f;11.0f;12.0f;12.1a"/' CMakeLists.txt
+
+    echo "✓ All architecture lists patched for sm_121a support"
 fi
 
 if [ -f "${SCRIPT_DIR}/patches/pyproject.patch" ]; then
