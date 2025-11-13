@@ -152,15 +152,14 @@ git checkout ${VLLM_VERSION}
 git submodule update --init --recursive
 
 echo ""
-echo "=== Applying Thinkube patches for Blackwell sm_121a support ==="
+echo "=== Applying Blackwell patches for DGX Spark GB10 ==="
+echo "Source: NVIDIA Forum - https://forums.developer.nvidia.com/t/run-vllm-in-spark/348862"
 
-# Apply Blackwell patches using sed script
-echo "Patching CMakeLists.txt for Blackwell sm_121a support..."
-sed -i -f "${SCRIPT_DIR}/patches/blackwell.sed" CMakeLists.txt
+# Apply NVIDIA's proven patch using git apply
+echo "Applying Blackwell CMakeLists.txt patch..."
+git apply "${SCRIPT_DIR}/patches/blackwell.patch"
 
 # Add -gencode flags to CMAKE_CUDA_FLAGS for sm_121a
-# Must do this because setup.py splits CMAKE_ARGS on whitespace, breaking flags with spaces
-# Insert BEFORE clear_cuda_arches() which extracts the flags
 echo "Adding -gencode arch=compute_121a,code=sm_121a to CMAKE_CUDA_FLAGS..."
 sed -i '/clear_cuda_arches(CUDA_ARCH_FLAGS)/i\  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode arch=compute_121a,code=sm_121a")' CMakeLists.txt
 
@@ -169,24 +168,8 @@ echo "Patching pyproject.toml for setuptools compatibility..."
 sed -i 's/license = {text = "Apache 2.0"}/license = {file = "LICENSE"}/' pyproject.toml
 
 # Patch setup.py to use shlex.split() instead of str.split() for CMAKE_ARGS
-# This preserves quoted arguments with spaces
 echo "Patching setup.py to handle CMAKE_ARGS with spaces..."
 sed -i 's/cmake_args += other_cmake_args.split()/import shlex; cmake_args += shlex.split(other_cmake_args)/' setup.py
-
-# Patch cmake/utils.cmake string_to_ver() to preserve architecture suffix ('a' for Ada/Blackwell)
-# Original regex loses suffix: "121a" -> "12.1" (missing 'a')
-# Fixed regex preserves suffix: "121a" -> "12.1a"
-echo "Patching cmake/utils.cmake to preserve architecture suffix..."
-cat > /tmp/string_to_ver_fix.txt << 'ENDPATCH'
-macro(string_to_ver OUT_VER IN_STR)
-  string(REGEX REPLACE "([0-9]+)([0-9])([a-z]?)" "\\1.\\2\\3" ${OUT_VER} ${IN_STR})
-endmacro()
-ENDPATCH
-# Replace the function (match from "macro(string_to_ver" to "endmacro()")
-sed -i '/^macro(string_to_ver/,/^endmacro()/{
-  /^macro(string_to_ver/r /tmp/string_to_ver_fix.txt
-  d
-}' cmake/utils.cmake
 
 echo "All patches applied successfully"
 
