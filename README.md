@@ -1,55 +1,68 @@
 # tk-vllm-wheels
 
-Pre-built vLLM wheels for DGX Spark GB10 (Blackwell sm_121a).
+Pre-compiled [vLLM](https://github.com/vllm-project/vllm) wheels for NVIDIA DGX Spark (arm64, sm_121 Blackwell GB10).
 
-This repository provides vLLM wheels with community patches for DGX Spark GB10 support.
+Official vLLM releases don't include pre-built aarch64 wheels. This repo builds vLLM from source with `TORCH_CUDA_ARCH_LIST=12.1a` and publishes the wheel as a GitHub Release.
 
-## Current Support
+## Download
 
-- ✅ **ARM64**: DGX Spark GB10 (Blackwell sm_121a)
-- ⏳ **x86-64**: RTX 20/30/40/50 series (planned)
+Grab the latest wheel from [Releases](https://github.com/thinkube/tk-vllm-wheels/releases).
 
-## Installation
+## Versions
 
-```bash
-pip install https://github.com/thinkube/tk-vllm-wheels/releases/download/v0.11.1rc5/vllm-0.11.1rc6.dev0+g2918c1b49.d20251112.cu130-cp312-cp312-linux_aarch64.whl
-```
+| Release | vLLM | PyTorch | CUDA | Patches |
+|---------|------|---------|------|---------|
+| v0.19.1 | 0.19.1 | 2.10.0 | 13.0 | None (sm_121 upstream) |
+| v0.11.1rc5 | 0.11.1rc5 | 2.9.0 | 13.0 | Blackwell CMake + gencode |
 
-## Patches Included
+Since v0.19.0, vLLM has native sm_121 support ([PR #38126](https://github.com/vllm-project/vllm/pull/38126)) — no patches required.
 
-### CMakeLists.txt - Blackwell sm_121a Support
-
-vLLM 0.11.1rc5's CMakeLists.txt has CUDA 13.0-specific architecture lists that only include `12.0f` (SM100) but not `12.1a` (Blackwell GB10). We patch:
-
-- **CUTLASS_MOE_DATA_ARCHS**: Critical for Mixture of Experts models
-- **SCALED_MM_ARCHS**: Scaled matrix multiplication kernels
-- **FP4_ARCHS**: FP4 quantization support
-- **MLA_ARCHS**: Multi-Level Attention kernels
-
-Each is patched to add `12.1a` to the CUDA 13.0 branch.
-
-### pyproject.toml
-
-Fixed license field for setuptools compatibility (`license = {file = "LICENSE"}`).
-
-Based on community solution: [github.com/eelbaz/dgx-spark-vllm-setup](https://github.com/eelbaz/dgx-spark-vllm-setup)
-
-## Requirements
-
-- Python 3.12
-- CUDA 13.0+
-- PyTorch 2.5.1+
-- ARM64 architecture (DGX Spark GB10)
-
-## Building Wheels
+## Build on DGX Spark
 
 ```bash
+# Default version (v0.19.1)
 ./build.sh
+
+# Specific version
+./build.sh v0.19.1
+
+# Force rebuild everything
+./build.sh v0.19.1 --force
 ```
 
-## Usage in Thinkube
+The build takes ~1-2 hours. Output goes to `./dist/`.
 
-This wheel is automatically used by Thinkube's vllm-base image.
+## Upload a release
+
+```bash
+cd dist
+gh release create v0.19.1 --repo thinkube/tk-vllm-wheels \
+    --title "vLLM v0.19.1 — arm64 sm_121" \
+    --notes "Pre-compiled vLLM wheel for DGX Spark (aarch64, sm_121, CUDA 13.0, Python 3.12)." \
+    vllm-*.whl checksums.txt
+```
+
+## How thinkube uses this
+
+During installation, thinkube builds a runtime image locally:
+
+```dockerfile
+FROM registry.cmxela.com/library/cuda:13.0.0-devel-ubuntu24.04
+RUN pip install https://github.com/thinkube/tk-vllm-wheels/releases/download/v0.19.1/vllm-....whl
+```
+
+The CUDA base image is already mirrored in the user's Harbor registry. The vLLM wheel contains only Apache 2.0 licensed code — CUDA/cuDNN are linked dynamically at runtime, not bundled in the wheel.
+
+## Build details
+
+| Parameter | Value |
+|-----------|-------|
+| Architecture | aarch64 (arm64) |
+| CUDA compute | sm_121 (Blackwell GB10) |
+| CUDA toolkit | 13.0 |
+| Python | 3.12 |
+| PyTorch | 2.10.0 |
+| TORCH_CUDA_ARCH_LIST | 12.1a |
 
 ## License
 
@@ -58,7 +71,6 @@ Apache 2.0
 ### Attribution
 
 - **Upstream vLLM**: Copyright vLLM contributors
-- **DGX Spark patches**: Community contribution (see github.com/eelbaz/dgx-spark-vllm-setup)
-- **tk-vllm build scripts and packaging**: Copyright 2025 Alejandro Martínez Corriá and the Thinkube contributors
+- **Build scripts and packaging**: Copyright 2025 Alejandro Martínez Corriá and the Thinkube contributors
 
 All code is licensed under Apache License 2.0.

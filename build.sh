@@ -2,44 +2,49 @@
 # Copyright 2025 Alejandro Martínez Corriá and the Thinkube contributors
 # SPDX-License-Identifier: Apache-2.0
 
-# Build tk-vllm wheel for DGX Spark GB10 (ARM64)
+# Build vLLM wheel for DGX Spark GB10 (ARM64, sm_121)
 # Run on: DGX Spark GB10 (ARM64/aarch64)
+#
+# Usage: ./build.sh [version] [--force]
+#   version: vLLM version tag (default: v0.19.1)
+#   --force: rebuild all components from scratch
 
-set -e
+set -euo pipefail
 
-VLLM_VERSION="v0.11.1rc5"
-BUILD_DIR="/tmp/tk-vllm-build"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Parse command line arguments
-FORCE_REBUILD=false
-if [ "$1" == "--force" ]; then
+VLLM_VERSION="${1:-v0.19.1}"
+if [ "$VLLM_VERSION" = "--force" ]; then
+    VLLM_VERSION="v0.19.1"
     FORCE_REBUILD=true
-    echo "Force rebuild enabled - will rebuild all components"
+else
+    FORCE_REBUILD=false
+    if [ "${2:-}" = "--force" ]; then
+        FORCE_REBUILD=true
+    fi
 fi
 
-echo "=== Building tk-vllm wheel for DGX Spark GB10 ==="
-echo "vLLM version: ${VLLM_VERSION}"
+BUILD_DIR="/tmp/tk-vllm-build"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DIST_DIR="${SCRIPT_DIR}/dist"
+
+echo "=== Building vLLM ${VLLM_VERSION} wheel for DGX Spark GB10 ==="
 echo "Build directory: ${BUILD_DIR}"
+echo "Output: ${DIST_DIR}"
 echo ""
 
-# Check we're on ARM64
 if [ "$(uname -m)" != "aarch64" ]; then
     echo "ERROR: This script must run on ARM64 (aarch64)"
-    echo "Current architecture: $(uname -m)"
     exit 1
 fi
 
-# Clean previous build only if --force specified
 if [ "$FORCE_REBUILD" = true ] && [ -d "${BUILD_DIR}" ]; then
-    echo "Removing previous build directory (--force specified)..."
+    echo "Removing previous build directory (--force)..."
     rm -rf "${BUILD_DIR}"
 fi
 
-mkdir -p "${BUILD_DIR}"
+mkdir -p "${BUILD_DIR}" "${DIST_DIR}"
 cd "${BUILD_DIR}"
 
-# Install system dependencies
+# System dependencies
 echo ""
 echo "=== Installing system dependencies ==="
 sudo apt-get update
@@ -51,154 +56,103 @@ sudo apt-get install -y --no-install-recommends \
     git \
     build-essential \
     ninja-build \
-    scons \
+    cmake \
     wget \
     curl
 
-# Install uv for better dependency management
-if [ ! -f "$HOME/.local/bin/uv" ]; then
+# Install uv
+if ! command -v uv &>/dev/null; then
     echo ""
     echo "=== Installing uv ==="
     curl -LsSf https://astral.sh/uv/install.sh | sh
-else
-    echo ""
-    echo "=== uv already installed, skipping ==="
 fi
 export PATH="$HOME/.local/bin:$PATH"
 
-# Create virtual environment
+# Virtual environment
 if [ ! -d "${BUILD_DIR}/venv" ] || [ "$FORCE_REBUILD" = true ]; then
     echo ""
     echo "=== Creating virtual environment ==="
-    uv venv --python 3.12 ${BUILD_DIR}/venv
-else
-    echo ""
-    echo "=== Virtual environment already exists, reusing ==="
+    uv venv --python 3.12 "${BUILD_DIR}/venv"
 fi
-source ${BUILD_DIR}/venv/bin/activate
+source "${BUILD_DIR}/venv/bin/activate"
 
-# Install pip in the venv so we can use 'python -m pip wheel' which respects CMAKE_ARGS
-echo ""
-echo "=== Installing pip in venv ==="
 uv pip install pip
 
-# Set environment variables
+# Environment
 export CUDA_HOME=/usr/local/cuda-13.0
 export PATH="${CUDA_HOME}/bin:${PATH}"
-export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}"
-export TRITON_PTXAS_PATH="${CUDA_HOME}/bin/ptxas"
+export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH:-}"
 export TORCH_CUDA_ARCH_LIST="12.1a"
 export VLLM_TARGET_DEVICE=cuda
 
-# Check if PyTorch is already installed
-if python -c "import torch; assert torch.__version__ == '2.9.0+cu130'" 2>/dev/null && [ "$FORCE_REBUILD" = false ]; then
+# PyTorch 2.10.0 with CUDA 13.0
+PYTORCH_VERSION="2.10.0"
+if python -c "import torch; assert torch.__version__.startswith('${PYTORCH_VERSION}')" 2>/dev/null && [ "$FORCE_REBUILD" = false ]; then
     echo ""
-    echo "=== PyTorch 2.9.0+cu130 already installed, skipping ==="
+    echo "=== PyTorch ${PYTORCH_VERSION}+cu130 already installed, skipping ==="
 else
     echo ""
-    echo "=== Installing PyTorch 2.9.0 (pinned version for vLLM 0.11.1rc5) ==="
+    echo "=== Installing PyTorch ${PYTORCH_VERSION} ==="
     uv pip install \
-        torch==2.9.0 \
-        torchvision==0.24.0 \
-        torchaudio==2.9.0 \
+        "torch==${PYTORCH_VERSION}" \
         --index-url https://download.pytorch.org/whl/cu130
 fi
 
-# Check if build dependencies are installed
-if python -c "import cmake, ninja, setuptools_scm" 2>/dev/null && [ "$FORCE_REBUILD" = false ]; then
-    echo ""
-    echo "=== Build dependencies already installed, skipping ==="
-else
-    echo ""
-    echo "=== Installing build dependencies ==="
-    uv pip install \
-        cmake>=3.26.1 \
-        ninja \
-        packaging>=24.2 \
-        wheel \
-        "setuptools>=77.0.3,<80.0.0" \
-        setuptools-scm>=8 \
-        jinja2>=3.1.6 \
-        regex \
-        build
-fi
+# Build dependencies (from vLLM's requirements/build.txt)
+echo ""
+echo "=== Installing build dependencies ==="
+uv pip install \
+    "cmake>=3.26.1" \
+    ninja \
+    "packaging>=24.2" \
+    wheel \
+    "setuptools>=77.0.3,<81.0.0" \
+    "setuptools-scm>=8" \
+    "jinja2>=3.1.6" \
+    regex \
+    build \
+    "protobuf>=5.29.6"
 
-# Check if Triton is already built
-if [ -d "${BUILD_DIR}/triton" ] && python -c "from importlib.metadata import version; assert 'git' in version('triton')" 2>/dev/null && [ "$FORCE_REBUILD" = false ]; then
-    echo ""
-    echo "=== Triton already built and installed, skipping (use --force to rebuild) ==="
-else
-    echo ""
-    echo "=== Cloning and building Triton (main branch) ==="
-    if [ -d "${BUILD_DIR}/triton" ]; then
-        rm -rf "${BUILD_DIR}/triton"
-    fi
-    git clone https://github.com/triton-lang/triton.git
-    cd triton
-    uv pip install -r python/requirements.txt
-    uv pip install -e .
-    cd "${BUILD_DIR}"
-fi
-
+# Clone vLLM
 echo ""
 echo "=== Cloning vLLM ${VLLM_VERSION} ==="
-# Always rebuild vLLM (remove old build if exists)
 if [ -d "${BUILD_DIR}/vllm" ]; then
     rm -rf "${BUILD_DIR}/vllm"
 fi
-git clone https://github.com/vllm-project/vllm.git
+git clone --depth 1 --branch "${VLLM_VERSION}" \
+    https://github.com/vllm-project/vllm.git
 cd vllm
-git checkout ${VLLM_VERSION}
-git submodule update --init --recursive
+
+# No patches needed — sm_121 support is upstream since v0.19.0 (PR #38126)
 
 echo ""
-echo "=== Applying Blackwell patches for DGX Spark GB10 ==="
-echo "Source: NVIDIA Forum - https://forums.developer.nvidia.com/t/run-vllm-in-spark/348862"
+echo "=== Preparing build ==="
+python use_existing_torch.py
+pip install -r requirements/build.txt
 
-# Apply NVIDIA's proven patch using git apply
-echo "Applying Blackwell CMakeLists.txt patch..."
-git apply "${SCRIPT_DIR}/patches/blackwell.patch"
-
-# Add -gencode flags to CMAKE_CUDA_FLAGS for sm_121a
-echo "Adding -gencode arch=compute_121a,code=sm_121a to CMAKE_CUDA_FLAGS..."
-sed -i '/clear_cuda_arches(CUDA_ARCH_FLAGS)/i\  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode arch=compute_121a,code=sm_121a")' CMakeLists.txt
-
-# Fix pyproject.toml license field
-echo "Patching pyproject.toml for setuptools compatibility..."
-sed -i 's/license = {text = "Apache 2.0"}/license = {file = "LICENSE"}/' pyproject.toml
-
-# Patch setup.py to use shlex.split() instead of str.split() for CMAKE_ARGS
-echo "Patching setup.py to handle CMAKE_ARGS with spaces..."
-sed -i 's/cmake_args += other_cmake_args.split()/import shlex; cmake_args += shlex.split(other_cmake_args)/' setup.py
-
-echo "All patches applied successfully"
-
-# Clean build directory to avoid cached CMake settings
-echo ""
-echo "=== Cleaning build directory ==="
-rm -rf build/
+TOTAL_CORES=$(nproc)
+MAX_JOBS=$(( TOTAL_CORES > 4 ? TOTAL_CORES - 2 : TOTAL_CORES ))
+export MAX_JOBS
 
 echo ""
-echo "=== Building wheel (this may take a while) ==="
-# Force sm_121a architecture via CMAKE_ARGS (setup.py now patched to use shlex.split())
-export CMAKE_ARGS="-DCMAKE_CUDA_FLAGS='-allow-unsupported-compiler -gencode arch=compute_121a,code=sm_121a'"
-MAX_JOBS=8 python3 -m pip wheel --no-build-isolation --no-deps -w dist .
+echo "=== Building wheel (MAX_JOBS=${MAX_JOBS}, ~1-2 hours) ==="
+pip wheel --no-build-isolation --no-deps --wheel-dir "${DIST_DIR}" .
 
 echo ""
-echo "=== Wheel built successfully! ==="
-ls -lh dist/
-
-# Generate checksum
-cd dist
+echo "=== Generating checksums ==="
+cd "${DIST_DIR}"
 sha256sum vllm-*.whl > checksums.txt
 
 WHEEL_FILE=$(ls vllm-*.whl)
 
 echo ""
 echo "=== Build complete! ==="
-echo "Wheel: ${BUILD_DIR}/vllm/dist/${WHEEL_FILE}"
-echo "Checksum: ${BUILD_DIR}/vllm/dist/checksums.txt"
+echo "Wheel: ${DIST_DIR}/${WHEEL_FILE}"
+echo "Checksum: ${DIST_DIR}/checksums.txt"
 echo ""
-echo "Next step:"
-echo "  cd ${BUILD_DIR}/vllm/dist"
-echo "  gh release create ${VLLM_VERSION} --repo thinkube/tk-vllm-wheels --title 'tk-vllm ${VLLM_VERSION}' --notes 'tk-vllm for DGX Spark GB10 (ARM64)' ${WHEEL_FILE} checksums.txt"
+echo "To create a release:"
+echo "  cd ${DIST_DIR}"
+echo "  gh release create ${VLLM_VERSION} --repo thinkube/tk-vllm-wheels \\"
+echo "    --title 'vLLM ${VLLM_VERSION} — arm64 sm_121' \\"
+echo "    --notes 'Pre-compiled vLLM wheel for DGX Spark (aarch64, sm_121, CUDA 13.0, Python 3.12).' \\"
+echo "    ${WHEEL_FILE} checksums.txt"
