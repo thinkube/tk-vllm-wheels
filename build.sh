@@ -11,9 +11,9 @@
 
 set -euo pipefail
 
-VLLM_VERSION="${1:-v0.19.1}"
+VLLM_VERSION="${1:-v0.20.0}"
 if [ "$VLLM_VERSION" = "--force" ]; then
-    VLLM_VERSION="v0.19.1"
+    VLLM_VERSION="v0.20.0"
     FORCE_REBUILD=true
 else
     FORCE_REBUILD=false
@@ -85,8 +85,8 @@ export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH:-}"
 export TORCH_CUDA_ARCH_LIST="12.1a"
 export VLLM_TARGET_DEVICE=cuda
 
-# PyTorch 2.10.0 with CUDA 13.0
-PYTORCH_VERSION="2.10.0"
+# PyTorch version matching vLLM's requirements
+PYTORCH_VERSION="2.11.0"
 if python -c "import torch; assert torch.__version__.startswith('${PYTORCH_VERSION}')" 2>/dev/null && [ "$FORCE_REBUILD" = false ]; then
     echo ""
     echo "=== PyTorch ${PYTORCH_VERSION}+cu130 already installed, skipping ==="
@@ -128,7 +128,11 @@ cd vllm
 echo ""
 echo "=== Preparing build ==="
 python use_existing_torch.py
-pip install -r requirements/build.txt
+if [ -f requirements/build.txt ]; then
+    pip install -r requirements/build.txt
+elif [ -f requirements/build/cuda.txt ]; then
+    pip install -r requirements/build/cuda.txt
+fi
 
 TOTAL_CORES=$(nproc)
 MAX_JOBS=$(( TOTAL_CORES > 4 ? TOTAL_CORES - 2 : TOTAL_CORES ))
