@@ -11,7 +11,7 @@ Official vLLM releases don't include pre-built aarch64 wheels. This repo builds 
 
 ## How it reaches a user
 
-The wheel is a release file used by an image build of the core platform in [thinkube](https://github.com/thinkube/thinkube). When the Thinkube installer builds the base images (`core/harbor-images/14_build_base_images.yaml`), the `vllm-base` image (`core/harbor-images/base-images/vllm-base.Containerfile.j2`) installs the wheel of the release named by `TK_VLLM_VERSION` (today `0.23.0`) on arm64, with `torch==2.11.0` from the CUDA 13.0 PyTorch index. On amd64 the same image installs `vllm` from PyPI instead. The image is built from the CUDA 13.0 base image already mirrored in the platform's Harbor registry. The vLLM optional component ([tkt-vllm-gradio](https://github.com/thinkube/tkt-vllm-gradio)) is built on `vllm-base`. The wheel is not installed on its own.
+The wheel is a release file used by an image build of the core platform in [thinkube](https://github.com/thinkube/thinkube). When the Thinkube installer builds the base images (`core/harbor-images/14_build_base_images.yaml`), the `vllm-base` image (`core/harbor-images/base-images/vllm-base.Containerfile.j2`) installs the wheel of the release named by `vllm_version` in `14_build_base_images.yaml` (today `0.23.0`) on arm64, with `torch==2.11.0` from the CUDA 13.0 PyTorch index. On amd64 the same image installs `vllm` from PyPI instead. The image is built from the CUDA 13.0 base image already mirrored in the platform's Harbor registry. The vLLM optional component ([tkt-vllm-gradio](https://github.com/thinkube/tkt-vllm-gradio)) is built on `vllm-base`. The wheel is not installed on its own.
 
 The vLLM wheel contains only Apache 2.0 licensed code — CUDA/cuDNN are linked dynamically at runtime, not bundled in the wheel.
 
@@ -50,7 +50,7 @@ Since v0.19.0, vLLM has native sm_121 support ([PR #38126](https://github.com/vl
 `build.sh` must run on arm64 (aarch64). It installs system packages with `sudo apt-get` and installs `uv` if it is missing.
 
 ```bash
-# Default version (v0.20.0)
+# Default version (v0.23.0)
 ./build.sh
 
 # Specific version
@@ -72,7 +72,7 @@ gh release create v0.23.0 --repo thinkube/tk-vllm-wheels \
     vllm-*.whl checksums.txt
 ```
 
-To use a new release, change `TK_VLLM_VERSION` and the wheel file name in `vllm-base.Containerfile.j2`, and the `torch==` pin if the PyTorch version changed.
+To use a new release, change `vllm_version` and `vllm_arm64_wheel` in `14_build_base_images.yaml`, and the `torch==` pin in `vllm-base.Containerfile.j2` if the PyTorch version changed. The `vllm-base` image tag starts with `vllm_version`, so a new version builds a new image tag.
 
 ## License
 

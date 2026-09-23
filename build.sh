@@ -6,14 +6,16 @@
 # Run on: DGX Spark GB10 (ARM64/aarch64)
 #
 # Usage: ./build.sh [version] [--force]
-#   version: vLLM version tag (default: v0.19.1)
+#   version: vLLM version tag (default: $DEFAULT_VLLM_VERSION)
 #   --force: rebuild all components from scratch
 
 set -euo pipefail
 
-VLLM_VERSION="${1:-v0.20.0}"
+DEFAULT_VLLM_VERSION="v0.23.0"
+
+VLLM_VERSION="${1:-$DEFAULT_VLLM_VERSION}"
 if [ "$VLLM_VERSION" = "--force" ]; then
-    VLLM_VERSION="v0.20.0"
+    VLLM_VERSION="$DEFAULT_VLLM_VERSION"
     FORCE_REBUILD=true
 else
     FORCE_REBUILD=false
