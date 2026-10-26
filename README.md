@@ -64,8 +64,10 @@ Since v0.19.0, vLLM has native sm_121 support ([PR #38126](https://github.com/vl
 # Force rebuild everything
 ./build.sh v0.23.0 --force
 
-# Against the PyTorch already installed, inside NVIDIA's PyTorch container
-./build.sh v0.23.0 --existing-torch
+# Against the PyTorch already installed, inside NVIDIA's PyTorch container:
+# a clone of this repository mounted at /work, the wheel lands in ./dist
+podman run --rm -v "$PWD:/work" -w /work nvcr.io/nvidia/pytorch:26.03-py3 \
+    bash build.sh v0.23.0 --existing-torch
 ```
 
 `--existing-torch` builds on the PyTorch of the environment it runs in instead of installing one: for NVIDIA's PyTorch containers, whose PyTorch is a build of its own, so that the wheel imports there. It installs no system packages (the container has the compilers), uses the container's CUDA toolkit, and when that PyTorch lacks `register_opaque_type`'s `hoist` keyword it patches vLLM's one call to it and writes the diff beside the wheel. Such a release is tagged with the container's release after the vLLM version, `v0.23.0-nv26.03`.
