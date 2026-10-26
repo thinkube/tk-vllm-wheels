@@ -114,15 +114,14 @@ else
 fi
 export PATH="${CUDA_HOME}/bin:${PATH}"
 export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH:-}"
-# The GPUs the wheel is compiled for: the GB10 on arm64; on amd64, every NVIDIA
-# GPU from Ampere to Blackwell, as NVIDIA's own containers do. TORCH_CUDA_ARCH_LIST
-# set beforehand wins.
-if [ -z "${TORCH_CUDA_ARCH_LIST:-}" ]; then
-    if [ "$ARCH" = "aarch64" ]; then
-        export TORCH_CUDA_ARCH_LIST="12.1a"
-    else
-        export TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;10.0;12.0"
-    fi
+# The GPUs the wheel is compiled for. On arm64 the GB10 only, whatever the
+# environment says (NVIDIA's containers set a list without 12.1a). On amd64,
+# the environment's TORCH_CUDA_ARCH_LIST when set (NVIDIA's containers set
+# 7.5 to 12.0+PTX, the GPUs their PyTorch is built for), else Ampere to Blackwell.
+if [ "$ARCH" = "aarch64" ]; then
+    export TORCH_CUDA_ARCH_LIST="12.1a"
+elif [ -z "${TORCH_CUDA_ARCH_LIST:-}" ]; then
+    export TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;10.0;12.0"
 fi
 echo "GPU architectures: ${TORCH_CUDA_ARCH_LIST}"
 export VLLM_TARGET_DEVICE=cuda

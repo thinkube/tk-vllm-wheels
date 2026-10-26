@@ -23,7 +23,7 @@ Standalone use is not supported. The wheels are built and tested only as part of
 
 | Release | vLLM | PyTorch | CUDA | Patches |
 |---------|------|---------|------|---------|
-| v0.23.0-nv26.03 (arm64 and amd64 wheels) | 0.23.0, built with `--existing-torch` on `nvcr.io/nvidia/pytorch:26.03-py3`; the amd64 wheel compiled for Ampere to Blackwell (8.0 to 12.0) | 2.11.0a0 (NVIDIA's build, nv26.3) | 13.2 | `register_opaque_type` called without `hoist` where that PyTorch has no such keyword (`patch-hoist.diff` in the release). For training environments on NVIDIA's container, such as llebre's; the wheel of v0.23.0 does not import there |
+| v0.23.0-nv26.03 (arm64 and amd64 wheels) | 0.23.0, built with `--existing-torch` on `nvcr.io/nvidia/pytorch:26.03-py3`; the amd64 wheel compiled for the container's GPU list, 7.5 to 12.0+PTX | 2.11.0a0 (NVIDIA's build, nv26.3) | 13.2 | `register_opaque_type` called without `hoist` where that PyTorch has no such keyword (`patch-hoist.diff` in the release). For training environments on NVIDIA's container, such as llebre's; the wheel of v0.23.0 does not import there |
 | v0.23.0 | 0.23.0 (upstream commit 0fc695fc6; version string 0.23.1.dev0) | 2.11.0 | 13.0 | None (sm_121 upstream). DFlash, NVFP4 and `VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR` present |
 | v0.20.0 | 0.20.0 (version string 0.20.1.dev0) | 2.11.0 | 13.0 | None (sm_121 upstream) |
 | v0.19.1 | 0.19.1 | 2.10.0 | 13.0 | None (sm_121 upstream) |
@@ -70,7 +70,7 @@ podman run --rm -v "$PWD:/work" -w /work nvcr.io/nvidia/pytorch:26.03-py3 \
     bash build.sh v0.23.0 --existing-torch
 ```
 
-`--existing-torch` builds on the PyTorch of the environment it runs in instead of installing one: for NVIDIA's PyTorch containers, whose PyTorch is a build of its own, so that the wheel imports there. It installs no system packages (the container has the compilers), uses the container's CUDA toolkit, and when that PyTorch lacks `register_opaque_type`'s `hoist` keyword it patches vLLM's one call to it and writes the diff beside the wheel. Such a release is tagged with the container's release after the vLLM version, `v0.23.0-nv26.03`, and holds one wheel per architecture: the same command on an amd64 machine builds the x86-64 wheel, for every NVIDIA GPU from Ampere to Blackwell (`TORCH_CUDA_ARCH_LIST` set beforehand narrows it).
+`--existing-torch` builds on the PyTorch of the environment it runs in instead of installing one: for NVIDIA's PyTorch containers, whose PyTorch is a build of its own, so that the wheel imports there. It installs no system packages (the container has the compilers), uses the container's CUDA toolkit, and when that PyTorch lacks `register_opaque_type`'s `hoist` keyword it patches vLLM's one call to it and writes the diff beside the wheel. Such a release is tagged with the container's release after the vLLM version, `v0.23.0-nv26.03`, and holds one wheel per architecture: the same command on an amd64 machine builds the x86-64 wheel for the GPUs of the container's `TORCH_CUDA_ARCH_LIST` (7.5 to 12.0+PTX in NVIDIA's), or Ampere to Blackwell where none is set; on arm64 the wheel is always for the GB10.
 
 The build takes ~1-2 hours. Output goes to `./dist/`: the wheel and `checksums.txt`. The work directory is `/tmp/tk-vllm-build`.
 
