@@ -212,7 +212,8 @@ pip wheel --no-build-isolation --no-deps --wheel-dir "${DIST_DIR}" .
 echo ""
 echo "=== Checking the wheel imports on this PyTorch ==="
 pip install --no-deps "${DIST_DIR}"/vllm-*.whl
-python -c "import torch, vllm, vllm._C; print(f'vllm {vllm.__version__} imports on PyTorch {torch.__version__}')"
+# from outside the source tree, so that the installed wheel is what imports
+(cd / && python -c "import torch, vllm, vllm._C; print(f'vllm {vllm.__version__} imports on PyTorch {torch.__version__}')")
 
 echo ""
 echo "=== Generating checksums ==="
