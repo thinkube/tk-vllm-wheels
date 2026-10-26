@@ -66,11 +66,11 @@ Since v0.19.0, vLLM has native sm_121 support ([PR #38126](https://github.com/vl
 
 # Against the PyTorch already installed, inside NVIDIA's PyTorch container:
 # a clone of this repository mounted at /work, the wheel lands in ./dist
-podman run --rm -v "$PWD:/work" -w /work nvcr.io/nvidia/pytorch:26.03-py3 \
-    bash build.sh v0.23.0 --existing-torch
+podman run --rm --device nvidia.com/gpu=all -v "$PWD:/work" -w /work nvcr.io/nvidia/pytorch:26.03-py3 \
+    bash build.sh v0.22.1 --existing-torch
 ```
 
-`--existing-torch` builds on the PyTorch of the environment it runs in instead of installing one: for NVIDIA's PyTorch containers, whose PyTorch is a build of its own, so that the wheel imports there. It installs no system packages (the container has the compilers), uses the container's CUDA toolkit, and when that PyTorch lacks `register_opaque_type`'s `hoist` keyword it patches vLLM's one call to it and writes the diff beside the wheel. Such a release is tagged with the container's release after the vLLM version, `v0.23.0-nv26.03`, and holds one wheel per architecture: the same command on an amd64 machine builds the x86-64 wheel for the GPUs of the container's `TORCH_CUDA_ARCH_LIST` (7.5 to 12.0+PTX in NVIDIA's), or Ampere to Blackwell where none is set; on arm64 the wheel is always for the GB10.
+The GPU is needed only for the import check at the end of the build (`--device nvidia.com/gpu=all` with the Container Device Interface, or `--gpus all`). `--existing-torch` builds on the PyTorch of the environment it runs in instead of installing one: for NVIDIA's PyTorch containers, whose PyTorch is a build of its own, so that the wheel imports there. It installs no system packages (the container has the compilers), uses the container's CUDA toolkit, and when that PyTorch lacks `register_opaque_type`'s `hoist` keyword it patches vLLM's one call to it and writes the diff beside the wheel. Such a release is tagged with the container's release after the vLLM version, `v0.23.0-nv26.03`, and holds one wheel per architecture: the same command on an amd64 machine builds the x86-64 wheel for the GPUs of the container's `TORCH_CUDA_ARCH_LIST` (7.5 to 12.0+PTX in NVIDIA's), or Ampere to Blackwell where none is set; on arm64 the wheel is always for the GB10.
 
 The build takes ~1-2 hours. Output goes to `./dist/`: the wheel and `checksums.txt`. The work directory is `/tmp/tk-vllm-build`.
 
