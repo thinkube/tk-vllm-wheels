@@ -9,7 +9,8 @@
 #   version: vLLM version tag (default: $DEFAULT_VLLM_VERSION)
 #   --force: rebuild all components from scratch
 #   --existing-torch: build against the PyTorch already installed in this
-#       environment instead of installing PyTorch from PyTorch's CUDA index.
+#       environment instead of installing PyTorch from PyTorch's CUDA index;
+#       on amd64 as well, where the wheel covers Ampere to Blackwell.
 #       For NVIDIA's PyTorch containers (nvcr.io/nvidia/pytorch), whose
 #       PyTorch is a build of its own: a wheel built on PyTorch's index does
 #       not import there. The venv then sees the environment's packages, the
@@ -45,8 +46,9 @@ echo "Output: ${DIST_DIR}"
 echo "PyTorch: $([ "$EXISTING_TORCH" = true ] && echo "the environment's" || echo "2.11.0 from PyTorch's CUDA 13.0 index")"
 echo ""
 
-if [ "$(uname -m)" != "aarch64" ]; then
-    echo "ERROR: This script must run on ARM64 (aarch64)"
+ARCH="$(uname -m)"
+if [ "$ARCH" != "aarch64" ] && [ "$EXISTING_TORCH" = false ]; then
+    echo "ERROR: This script must run on ARM64 (aarch64); on another architecture give --existing-torch"
     exit 1
 fi
 
@@ -112,7 +114,17 @@ else
 fi
 export PATH="${CUDA_HOME}/bin:${PATH}"
 export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH:-}"
-export TORCH_CUDA_ARCH_LIST="12.1a"
+# The GPUs the wheel is compiled for: the GB10 on arm64; on amd64, every NVIDIA
+# GPU from Ampere to Blackwell, as NVIDIA's own containers do. TORCH_CUDA_ARCH_LIST
+# set beforehand wins.
+if [ -z "${TORCH_CUDA_ARCH_LIST:-}" ]; then
+    if [ "$ARCH" = "aarch64" ]; then
+        export TORCH_CUDA_ARCH_LIST="12.1a"
+    else
+        export TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;10.0;12.0"
+    fi
+fi
+echo "GPU architectures: ${TORCH_CUDA_ARCH_LIST}"
 export VLLM_TARGET_DEVICE=cuda
 
 # PyTorch version matching vLLM's requirements
